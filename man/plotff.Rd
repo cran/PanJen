@@ -23,6 +23,6 @@ library(PanJen)
 data("hvidovre")
 
 form<-formula(lprice ~brick+roof_tile+roof_cemen+rebuild90+rebuild00+y7+y8+y9) 
-PanJenArea<-fform(hvidovre,"area",form) 
+PanJenArea<-fform(data=hvidovre,variable="area",base_form=form) 
 plotff(PanJenArea) 
 }

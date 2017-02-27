@@ -4,63 +4,77 @@ library(RColorBrewer)
 library(Formula)
 library(lasso2)
 
-choose.fform <-function(data,variable,forms_to_test, distribution=gaussian, smoothing_splines=20){
-  ########################################
-  ###   convert input
-  ########################################
-  Forms=Formula(forms_to_test) ## turn formula-object into Formula-object
-  data$x=data$variable=get(variable,data)
-  nforms<-length(Forms)[2] ## number of functional forms+base
-  dist<-distribution
-  smo<-smoothing_splines
 
+
+choose.fform <-function(data,base_form,variable,functionList, distribution=gaussian){
   ########################################
   ###   VALIDATION
   ########################################
-  if (nforms<1) {
-    stop("missing functional forms - please use 'fform()'or see ??PanJen() for how to defince user-functions ")
+  
+  ## remove problematic transformations
+  a<-0
+  drops<-c()
+  suppressWarnings(
+    for (i in functionList){
+      a<-a+1
+      var<-i(get(variable,data))
+      var[!is.finite(var)] <- NA
+      if (mean(as.numeric(is.na(var)))>0){
+        print(paste(names(functionList)[a],"is dropped because it produces NaNs or infite",sep=" "))
+        drops<-c(drops,a)
+      }
+    }
+  )
+  functionList[drops]<-NULL
+  ## If there are no transformations lefts then stop
+  nforms<-length(functionList) ## number of functional forms+base
+  if (nforms<1) {" no transformations left"
   }
   
-  if (dim(data)[1]<dim(data)[1]) {
-    stop("At least one functional form produces NaNs")
-  }
-  if (!smo>0) {
-    print("Number of smoothing splines must be larger than 0 - Smoothing set to 20 splines by default")
-  }
-      
+  
+  #   
+  # ##############################
+  #   ## convert input
+  #   a=0
+  #   for (i in functionList){
+  #     a<-a+1
+  #     data[names(functionList)[a]]<-i(get(variable,data))
+  #   }
+  
   ########################################
   ###   creating table and lists for output 
   ########################################
   frameNames=c("smoothing","base")
-  for (j in 2:nforms){
-    frameNames=c(frameNames, as.character(formula(Forms, rhs =j, lhs=0))[2])
-    }
-  tableOut=matrix(nrow=nforms+1,ncol=3)
+  
+  
+  for (j in 1:nforms){
+    frameNames=c(frameNames, names(functionList)[j])
+  }
+  tableOut=matrix(nrow=nforms+2,ncol=3)
   rownames(tableOut)=frameNames
-  colnames(tableOut)= c("AIC", "BIC","ranking (AIC)")
+  colnames(tableOut)= c("AIC", "BIC","ranking (BIC)")
   
   
   ########################################
   ###   Estimate models and save AIC + BIC
   ########################################  
   ## Estimate base
-  baseForm=formula(Forms, rhs =1,collapse=T)
-  base<-gam(baseForm, 
-            family=dist,
+  base<-gam(base_form, 
+            family=distribution,
             method="GCV.Cp",
             data=data)
+  
   ## save for output
   tableOut[2,1]=AIC(base)
   tableOut[2,2]=BIC(base)
   models <- list(base)
   
-  ## estimate smoothing
+  
   equation_update<-
-    update.formula(baseForm,
-                   paste(paste(". ~ .+s(", all.vars(formula(Forms, rhs=2, lhs=0)),sep=""),
-                         paste(paste("k=",smo,sep=),")"),sep=",") )
+    update.formula(base_form, ~ . +s(var))
+  data$var<-get(variable,data)
   smoothing<-gam(equation_update, 
-                 family=dist,
+                 family=distribution,
                  method="GCV.Cp",
                  data=data)
   tableOut[1,1]=AIC(smoothing)
@@ -71,23 +85,28 @@ choose.fform <-function(data,variable,forms_to_test, distribution=gaussian, smoo
   namesLL=c("model_base","model_smoothing") ## model names
   
   
-  for (j in 1:(nforms-1)){    
-    equation_update<-merge.formula(baseForm,formula(Forms, lhs=0, rhs = c(j+1)))
+  for (j in 1:(nforms)){  
+    equation_update<-update.formula(base_form, ~ . + var)
+    data$var<-get(variable,data)
+    data$var<-functionList[[j]](data$var)
     model_c<-gam(equation_update, 
-                 family=dist,
+                 family=distribution,
                  method="GCV.Cp",
                  data=data)
     tableOut[j+2,1]=AIC(model_c)
     tableOut[j+2,2]=BIC(model_c)
     models <- c(models, list(model_c))
-    namesLL<-c(namesLL,paste("model",frameNames[j+2]
-                             , sep="_"))
+    namesLL<-c(namesLL,paste("model",names(functionList)[j], sep="_"))
   }
   names(models)<-namesLL
   
   
   ## sort table after AIC
-  tableOut[,3]=as.numeric(rank(tableOut[,1]))
+  tableOut[,1]<-round(tableOut[,1],2)
+  tableOut[,2]<-round(tableOut[,2],2)
+  
+  
+  tableOut[,3]=as.numeric(rank(tableOut[,2]))
   tableOut=tableOut[order(tableOut[,3]),]             
   
   ## sort models after BIC  
@@ -102,67 +121,80 @@ choose.fform <-function(data,variable,forms_to_test, distribution=gaussian, smoo
   output=list("models"=models,
               "dataset"=data,
               "rank.table"=tableOut,
-              "fforms"=Forms)
+              "functionList"=functionList,
+              "variable"=variable)
   class(output)<-"PJ"
   return(output) 
 }
 
 
-fform <-function(data,variable,base_form, distribution=gaussian, smoothing_splines=20){
+fform <-function(data,variable,base_form, distribution=gaussian){
   
   ## Predefined forms
-  formsPack<-Formula(y~I(1/variable^2)|I(1/variable)|I(log(variable))|I(variable^0.5)|variable|I(variable^2)|variable+I(variable^2)) 
-  ########################################
-  ###   convert input
-  ########################################
-  Forms<-Formula(base_form) ## turn formula-object into Formula-object
-  data$x=data$variable=get(variable,data)
-  nforms<-length(Forms)[2] ## check that a variable is provided
-  dist<-distribution
-  smo <-smoothing_splines  
+  functionList <- list(
+    linear = function(x) x,
+    sqroot = function(x) x^.5,
+    sq = function(x) x^2,
+    lin_sq = function(x) x+x^2,
+    invers = function(x) 1/(x^2),
+    log = function(x) log(x)
+  )
   
-  ########################################
-  ###   VALIDATION
-  ########################################
-  if (nforms<1) {
-    stop("missing variabel to test - please see ??PanJen() for syntax")
+  ## remove problematic transformations
+  a<-0
+  drops<-c()
+  suppressWarnings(
+    for (i in functionList){
+      a<-a+1
+      var<-i(get(variable,data))
+      var[!is.finite(var)] <- NA
+      if (mean(as.numeric(is.na(var)))>0){
+        print(paste(names(functionList)[a],"is dropped because it produces NaNs or infite",sep=" "))
+        drops<-c(drops,a)
+      }
+    }
+  )
+  functionList[drops]<-NULL
+  ## If there are no transformations lefts then stop
+  nforms<-length(functionList) ## number of functional forms+base
+  if (nforms<1) {" no transformations left"
   }
-  if (!smo>0) {
-    smo<-20
-    print("Number of smoothing splines must be larger than 0 - Smoothing set to 20 splines by default")
-  }
-  
   
   ########################################
   ###   creating table and lists for output 
   ########################################
-  frameNames<-c("smoothing","base", "1/x^2","1/x","log(x)","x^0.5","x", "x^2", "x+x^2")
-  tableOut<-matrix(nrow=9,ncol=3)
-  rownames(tableOut)<-frameNames
-  colnames(tableOut)<-c("AIC", "BIC","ranking (AIC)")
+  frameNames=c("smoothing","base")
+  
+  
+  for (j in 1:nforms){
+    frameNames=c(frameNames, names(functionList)[j])
+  }
+  tableOut=matrix(nrow=nforms+2,ncol=3)
+  rownames(tableOut)=frameNames
+  colnames(tableOut)= c("AIC", "BIC","ranking (BIC)")
   
   
   ########################################
   ###   Estimate models and save AIC + BIC
   ########################################  
   ## Estimate base
-  baseForm<-formula(Forms, rhs =1,collapse=T)
-  base<-gam(baseForm, 
-            family=dist,
+  base<-gam(base_form, 
+            family=distribution,
             method="GCV.Cp",
             data=data)
+  
   ## save for output
-  tableOut[2,1]<-AIC(base)
-  tableOut[2,2]<-BIC(base)
+  tableOut[2,1]=AIC(base)
+  tableOut[2,2]=BIC(base)
   models <- list(base)
   
   ## estimate smoothing
-  equation_update<-
-  update.formula(baseForm,
-                         paste(paste(". ~ .+s(variable, k=",smo,sep=""),")"))
   
+  equation_update<-
+    update.formula(base_form, ~ . +s(var))
+  data$var<-get(variable,data)
   smoothing<-gam(equation_update, 
-                 family=dist,
+                 family=distribution,
                  method="GCV.Cp",
                  data=data)
   tableOut[1,1]=AIC(smoothing)
@@ -171,105 +203,128 @@ fform <-function(data,variable,base_form, distribution=gaussian, smoothing_splin
   
   ## estimate one model for each transformation
   namesLL=c("model_base","model_smoothing") ## model names
-  for (j in 1:7){
-    equation_update<-merge.formula(baseForm, formula(formsPack, rhs=j, lhs=0))
+  
+  
+  for (j in 1:(nforms)){  
+    equation_update<-update.formula(base_form, ~ . + var)
+    data$var<-get(variable,data)
+    data$var<-functionList[[j]](data$var)
     model_c<-gam(equation_update, 
-                 family=dist,
+                 family=distribution,
                  method="GCV.Cp",
                  data=data)
     tableOut[j+2,1]=AIC(model_c)
     tableOut[j+2,2]=BIC(model_c)
     models <- c(models, list(model_c))
-    namesLL<-c(namesLL,paste("model",frameNames[j+2]
-                             , sep="_"))
+    namesLL<-c(namesLL,paste("model",names(functionList)[j], sep="_"))
   }
   names(models)<-namesLL
   
   
   ## sort table after AIC
-  tableOut[,3]=as.numeric(rank(tableOut[,1]))
+  tableOut[,1]<-round(tableOut[,1],2)
+  tableOut[,2]<-round(tableOut[,2],2)
+  
+  
+  tableOut[,3]=as.numeric(rank(tableOut[,2]))
   tableOut=tableOut[order(tableOut[,3]),]             
   
-  ## sort models after AIC  
+  ## sort models after BIC  
   order=paste("model",rownames(tableOut), sep="_")
   models<- models[order]
-  
-  
-  ## formula for output
-  formsAll=paste(as.character(Forms[2]),as.character(Forms[3]), sep="~")
-  FormsAll=Formula(formula(paste(formsAll,as.character(formsPack[3]),sep="|")))
-    
   #####################################################################
   ## return list  
   #####################################################################
   print(tableOut)   ## print table
   class(data)<-"data.frame"
+  
   output=list("models"=models,
               "dataset"=data,
-              "rank.table"=tableOut,                
-              "fforms"=FormsAll) 
+              "rank.table"=tableOut,
+              "functionList"=functionList,
+              "variable"=variable)
   class(output)<-"PJ"
-  return(output)
+  return(output) 
 }
 
-plotff<-function(input){
-   nModels= length(input$models) ## number of model
-   namesLL<-names(input$models)
-   ms<-grep("model_smoothing",namesLL)
-   varNam= all.vars(formula(input$fforms, lhs=0, rhs=2))[1] ## variable to test
-   contNam= all.vars(formula(input$fforms, lhs=0, rhs=1))## control variables
-   depNam=all.vars(formula(input$fforms, lhs=1, rhs=0)) ## dependent variable
-   input$dataset$variable=get(all.vars(formula(input$fforms, lhs=0, rhs=1)),input$dataset)  
-   
-   ######################################################################
-   ### creating prediction frame 
-   ######################################################################
-   ## 100 points from min to max of variable
-   ## median of all control variables
-   names<-all.vars(input$fforms)
-   pred_frame<-data.frame(matrix(NA, nrow=100, ncol=(length(names))))
-   names(pred_frame)<-c(names)
-   pred_frame$variable<-seq(as.numeric(quantile(input$dataset$x,0.05)),as.numeric(quantile(input$dataset$x,0.95)),(as.numeric(quantile(input$dataset$x,0.95))-as.numeric(quantile(input$dataset$x,0.05)))/100)[1:100]
-   pred_frame[varNam]<-pred_frame$variable
 
-   for (i in 1:length(contNam)){ ## predict y for each model
-     pred_frame[contNam[i]]<-
-     median(get(contNam[i],input$dataset))
+
+plotff<-function(input){
+  nModels= length(input$models) ## number of model
+  namesLL<-names(input$functionList)
+  nameslS<-names(input$models)
+  ms<-grep("model_smoothing",nameslS)
+  mb<-grep("model_base",nameslS)
+  # input$variable
+  # input$models$model_base
+  
+  ######################################################################
+  ### creating prediction frame 
+  ######################################################################
+  ## 100 points from min to max of variable
+  pred_frame<-data.frame(matrix(NA, nrow=100, ncol=1))
+  var<-get(input$variable,input$dataset)
+  pred_frame$var<-seq(as.numeric(quantile(var,0.05)),as.numeric(quantile(var,0.95)),(as.numeric(quantile(var,0.95))-as.numeric(quantile(var,0.05)))/100)[1:100]
+  
+  ## set all control variable to median value
+  control=apply(data.frame(input$models$model_base$model),2, median)
+  depNam<-names(control)[1]
+  control<-control[-1]
+  
+  for (i in 1:length(control)){
+    pred_frame[names(control)[i]]=as.numeric(rep(control[i],100))
   }
-   
+  
+  pred_frame$model_smoothing<-predict(input$models[["model_smoothing"]],newdata=pred_frame, type="response")
+  
+  pred_frame$model_base<-predict(input$models[["model_base"]],newdata=pred_frame, type="response")
+  
   ## predict dependent variable for each model
+  a=0
   for (i in namesLL){ ## predict y for each model
-    pred_frame[paste("y",i,sep="_")]=predict(input$models[[i]],newdata=pred_frame, type="response")
+    a=a+1
+    print(i)
+    var<-get(input$variable,input$data)
+    var<-input$functionList[[a]](var)
+    pred_frame[paste("model",i,sep="_")]=predict(input$models[[paste("model",i,sep="_")]],newdata=pred_frame, type="response")
   }   
-  firstM=length(contNam) + 4 ## first model in pred_frame
+  firstM=length(control) + 4 ## first model in pred_frame
   lastM=dim(pred_frame)[2] ## last model in pred_frame
   
+  
   ### Plotting
-  limx=c(min(pred_frame$variable),max(pred_frame$variable)) ## limits for x-axis
+  limx=c(min(pred_frame$var),max(pred_frame$var)) ## limits for x-axis
   limy=c(max(c(0,min(pred_frame[,firstM:lastM]))), max(pred_frame[,firstM:lastM])) ## limits for y-axis   
-   
+  
   #### plotting the the fit 
   par(mar=c(4, 4, 8.1, 12), xpd=TRUE)
   opt <- options("scipen" = 20)
-   
+  
   ## Start plot
-  plot(y_model_smoothing~variable, data=pred_frame, type="l",main="",sub="",xlab="x",ylab=depNam, lwd=3, col="black", xlim=limx, ylim=limy) ## name variable of interest
+  
+  plot(model_smoothing~var, data=pred_frame, type="l",main="",sub="",xlab=input$variable,ylab=depNam, lwd=3, col="black", xlim=limx, ylim=limy) ## name variable of interest
   
   ## adding base and  functional form lines 
-  color<-c("darkred","aquamarine4","darkgrey","blue3","orange3","brown3","chartreuse4","darkgreen","springgreen","gold","steelblue2","hotpink","blueviolet")
+  color<-c("darkred","aquamarine4","darkgrey","blue3","orange3","brown3","chartreuse4","springgreen","gold","steelblue2","hotpink","blueviolet")
   color[ms]<-"black"
+  color[mb]<-"darkgreen"
+  
   n<-0
   colL<-vector()
-   for (i in namesLL){
-     n<-n+1
-     lines(get(paste("y",i,sep="_"),pred_frame)~get("variable",pred_frame),
-           col= color[n], lwd=2)
-     colL=cbind(colL,as.character(color[n]))
-   }
-  namesL<-gsub("model_","",namesLL)
+  for (i in nameslS){
+    n<-n+1
+    lines(get(i,pred_frame)~get("var",pred_frame),
+          col= color[n], lwd=2)
+    colL=cbind(colL,as.character(color[n]))
+  }
+  
+  
+  lines(get("model_smoothing",pred_frame)~get("var",pred_frame),col="black", lwd=3)
+  nameslS<-gsub("model_","",nameslS)
+  
   legend(limx[2],limy[2],
          cex=1,bty="n",
-         namesL, 
+         nameslS, 
          fill=colL, 
          horiz=FALSE)
 }
