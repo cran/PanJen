@@ -1,8 +1,8 @@
-07e0734be5e83ae8ccf0bc3d6ff0f1ec *DESCRIPTION
+4d95cb73006e79f3113368fb8da741db *DESCRIPTION
 2ad6446819c058518aa4399a8db4c48b *NAMESPACE
-366ac9b8a800edaede7cac71f30ce23e *R/PanJen.R
+06af8855e304d3ea050879326c434a58 *R/PanJen.R
 ceaa2882644006c432720ea9fddbbaa0 *data/hvidovre.rda
-f98c2ef2c8e9a94c31e6d5a5178890f2 *man/choose.fform.Rd
-1b0359a0f6c8e124e876d6d40fda2994 *man/fform.Rd
+ea61c61de7bace693f4ee04ab6fbc625 *man/choose.fform.Rd
+7239140ef570f31bdea81e87654a924c *man/fform.Rd
 39fc68ac99dc3dc66439e2a13084f2fe *man/hvidovre.Rd
 88e505a020bc8a53bed25551cec487a7 *man/plotff.Rd

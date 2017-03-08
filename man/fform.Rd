@@ -6,8 +6,9 @@
 }
 
 \description{
-This function runs 9 regressions, one for each of the seven predefined transformations, one without the variable and one with a smoothing of the variable. 
-The printed output is a table with the transformations sorted according to their explanatory power measured by AIC. The table shows both AIC and BIC  for each regression, where BIC penalize for the number of explanatory variables.
+PanJen is built on the idea that the choice of a functional form can be extrapolated from model fit measures. The function provides a  ranking of different transformations according to their Baysian Information Criterion (BIC). The BIC provides a relative goodness-of-fit measure while accounting for the complexity of the model.
+The function provides BIC for a set of predefined transformations aswell as a model without the variable in question and a socalled smoothing of the variable. The models are estimated a Generalized additive model (GAM).A GAM is a special case of the Generalized Linear Model (GLM), where it is possible to include one or more so called smoothing functions. A smoothing function is a non-parametric way to include a continuous independent variable in a parametric model and thus make it semi-parametric. Please see Wood (2006) for an elaboration. 
+The printed output is a table with the transformations sorted according to their explanatory power measured by AIC. The table shows both AIC and BIC  for each regression, where BIC penalize for the number of explanatory variables
 }
 
 \usage{

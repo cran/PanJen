@@ -32,15 +32,6 @@ choose.fform <-function(data,base_form,variable,functionList, distribution=gauss
   }
   
   
-  #   
-  # ##############################
-  #   ## convert input
-  #   a=0
-  #   for (i in functionList){
-  #     a<-a+1
-  #     data[names(functionList)[a]]<-i(get(variable,data))
-  #   }
-  
   ########################################
   ###   creating table and lists for output 
   ########################################
@@ -116,6 +107,7 @@ choose.fform <-function(data,base_form,variable,functionList, distribution=gauss
   ## return list  
   #####################################################################
   print(tableOut)   ## print table
+  print("Smoothing is semi-parametric and data-driven transformation, please see Wood (2006) for an elaboration")
   class(data)<-"data.frame"
   
   output=list("models"=models,
@@ -132,12 +124,13 @@ fform <-function(data,variable,base_form, distribution=gaussian){
   
   ## Predefined forms
   functionList <- list(
-    linear = function(x) x,
-    sqroot = function(x) x^.5,
-    sq = function(x) x^2,
-    lin_sq = function(x) x+x^2,
-    invers = function(x) 1/(x^2),
-    log = function(x) log(x)
+    "x
+    " = function(x) x,
+    "x^2" = function(x) x^.5,
+    "sqr(x)" = function(x) x^2,
+    "x+x^2" = function(x) x+x^2,
+    "1/x" = function(x) 1/(x^2),
+    "log(x)" = function(x) log(x)
   )
   
   ## remove problematic transformations
@@ -149,7 +142,7 @@ fform <-function(data,variable,base_form, distribution=gaussian){
       var<-i(get(variable,data))
       var[!is.finite(var)] <- NA
       if (mean(as.numeric(is.na(var)))>0){
-        print(paste(names(functionList)[a],"is dropped because it produces NaNs or infite",sep=" "))
+        print(paste(names(functionList)[a],"is dropped because it produces NaNs or infinite",sep=" "))
         drops<-c(drops,a)
       }
     }
@@ -236,6 +229,7 @@ fform <-function(data,variable,base_form, distribution=gaussian){
   ## return list  
   #####################################################################
   print(tableOut)   ## print table
+  print("Smoothing is semi-parametric and data-driven transformation")   ## print GAM description
   class(data)<-"data.frame"
   
   output=list("models"=models,
@@ -261,6 +255,7 @@ plotff<-function(input){
   ######################################################################
   ### creating prediction frame 
   ######################################################################
+  
   ## 100 points from min to max of variable
   pred_frame<-data.frame(matrix(NA, nrow=100, ncol=1))
   var<-get(input$variable,input$dataset)
@@ -270,31 +265,28 @@ plotff<-function(input){
   control=apply(data.frame(input$models$model_base$model),2, median)
   depNam<-names(control)[1]
   control<-control[-1]
-  
   for (i in 1:length(control)){
     pred_frame[names(control)[i]]=as.numeric(rep(control[i],100))
   }
   
+  ## predict dependent variable for each model
   pred_frame$model_smoothing<-predict(input$models[["model_smoothing"]],newdata=pred_frame, type="response")
-  
   pred_frame$model_base<-predict(input$models[["model_base"]],newdata=pred_frame, type="response")
   
-  ## predict dependent variable for each model
+  pred_frame$var_orig<-pred_frame$var
   a=0
   for (i in namesLL){ ## predict y for each model
     a=a+1
-    print(i)
-    var<-get(input$variable,input$data)
-    var<-input$functionList[[a]](var)
+    pred_frame$var<-input$functionList[[a]](pred_frame$var_orig)
     pred_frame[paste("model",i,sep="_")]=predict(input$models[[paste("model",i,sep="_")]],newdata=pred_frame, type="response")
   }   
   firstM=length(control) + 4 ## first model in pred_frame
   lastM=dim(pred_frame)[2] ## last model in pred_frame
   
-  
+
   ### Plotting
   limx=c(min(pred_frame$var),max(pred_frame$var)) ## limits for x-axis
-  limy=c(max(c(0,min(pred_frame[,firstM:lastM]))), max(pred_frame[,firstM:lastM])) ## limits for y-axis   
+  limy=c(min(pred_frame$model_smoothing), max(pred_frame$model_smoothing)) ## limits for y-axis   
   
   #### plotting the the fit 
   par(mar=c(4, 4, 8.1, 12), xpd=TRUE)
