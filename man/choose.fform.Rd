@@ -21,7 +21,7 @@ A data.frame
 A character-string with the name of the variable to test
 }
   \item{base_form}{
-A formula object with the regressions without the variable that is tested
+A formula-object with the regressions without the variable that is tested
 }
   \item{functionList}{
 A list of transformations. Please see the example for an elaboration

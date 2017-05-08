@@ -1,15 +1,9 @@
-## read in packages
-library(mgcv)
-library(RColorBrewer)
-library(Formula)
-library(lasso2)
-
-
-
 choose.fform <-function(data,base_form,variable,functionList, distribution=gaussian){
   ########################################
   ###   VALIDATION
   ########################################
+  if (class(base_form)!="formula") {print("You need to provide a 'formula'-object, e.g. base_form<-formula(y ~x1+x2), Please see ?fform or ?formula for an example")}
+  stopifnot(class(base_form)=="formula")
   
   ## remove problematic transformations
   a<-0
@@ -28,8 +22,7 @@ choose.fform <-function(data,base_form,variable,functionList, distribution=gauss
   functionList[drops]<-NULL
   ## If there are no transformations lefts then stop
   nforms<-length(functionList) ## number of functional forms+base
-  if (nforms<1) {" no transformations left"
-  }
+  if (nforms<1) {" no transformations left"}
   
   
   ########################################
@@ -92,11 +85,9 @@ choose.fform <-function(data,base_form,variable,functionList, distribution=gauss
   names(models)<-namesLL
   
   
-  ## sort table after AIC
+  ## sort table after BIC
   tableOut[,1]<-round(tableOut[,1],2)
   tableOut[,2]<-round(tableOut[,2],2)
-  
-  
   tableOut[,3]=as.numeric(rank(tableOut[,2]))
   tableOut=tableOut[order(tableOut[,3]),]             
   
@@ -107,7 +98,10 @@ choose.fform <-function(data,base_form,variable,functionList, distribution=gauss
   ## return list  
   #####################################################################
   print(tableOut)   ## print table
-  print("Smoothing is semi-parametric and data-driven transformation, please see Wood (2006) for an elaboration")
+  print("Smoothing is a semi-parametric and data-driven transformation, please see Wood (2006) for an elaboration")
+  ## if a variable is repeated in base_form
+  if(grepl(variable,toString(base_form))){print(paste("please note that you included",variable,"in the base-formula and it is also the variable you test"))}
+  
   class(data)<-"data.frame"
   
   output=list("models"=models,
@@ -121,11 +115,12 @@ choose.fform <-function(data,base_form,variable,functionList, distribution=gauss
 
 
 fform <-function(data,variable,base_form, distribution=gaussian){
+  if (class(base_form)!="formula") {print("You need to provide a 'formula'-object, e.g. base_form<-formula(y~x1+x2), Please see ?fform or ?formula for an example")}
+  stopifnot(class(base_form)=="formula")
   
   ## Predefined forms
   functionList <- list(
-    "x
-    " = function(x) x,
+    "x" = function(x) x,
     "x^2" = function(x) x^.5,
     "sqr(x)" = function(x) x^2,
     "x+x^2" = function(x) x+x^2,
@@ -214,11 +209,9 @@ fform <-function(data,variable,base_form, distribution=gaussian){
   names(models)<-namesLL
   
   
-  ## sort table after AIC
+  ## sort table after BIC
   tableOut[,1]<-round(tableOut[,1],2)
   tableOut[,2]<-round(tableOut[,2],2)
-  
-  
   tableOut[,3]=as.numeric(rank(tableOut[,2]))
   tableOut=tableOut[order(tableOut[,3]),]             
   
@@ -229,7 +222,10 @@ fform <-function(data,variable,base_form, distribution=gaussian){
   ## return list  
   #####################################################################
   print(tableOut)   ## print table
-  print("Smoothing is semi-parametric and data-driven transformation")   ## print GAM description
+  print("Smoothing is a semi-parametric and data-driven transformation, please see Wood (2006) for an elaboration")   ## print GAM description
+  ## if the "variable" is repeated in "base_form"
+  if(grepl(variable,toString(base_form))){print(paste("please note that you included",variable,"in the base-formula and it is also the variable you test"))}
+
   class(data)<-"data.frame"
   
   output=list("models"=models,
@@ -240,8 +236,6 @@ fform <-function(data,variable,base_form, distribution=gaussian){
   class(output)<-"PJ"
   return(output) 
 }
-
-
 
 plotff<-function(input){
   nModels= length(input$models) ## number of model

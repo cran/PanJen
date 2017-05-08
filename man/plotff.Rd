@@ -11,7 +11,7 @@ plotff(input)
 }
 \arguments{
   \item{input}{
-A PJ-objected produced ced by fform or choose.fform
+A PJ-objected produced by fform or choose.fform
 }
 }
 \author{

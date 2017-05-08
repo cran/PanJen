@@ -2,7 +2,7 @@
 \name{fform}
 \alias{fform}
 
-\title{Compare a number of user-specified  transformations with a semiparametric smoothing and a model without the variable
+\title{Compare a number of transformations with a semiparametric smoothing and a model without the variable
 }
 
 \description{
@@ -22,7 +22,7 @@ A data.frame
 A character-string with the name of the variable to test
 }
   \item{base_form}{
-A formula object with the regressions without the variable that is tested
+A formula-object with the regressions without the variable that is tested
 }
   \item{distribution}{
 Assumed distribution, see mgcv-vignette for an elaboration. Default is gaussian
