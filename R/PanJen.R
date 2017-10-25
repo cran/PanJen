@@ -1,4 +1,7 @@
-choose.fform <-function(data,base_form,variable,functionList, distribution=gaussian){
+# require(mgcv) 
+
+
+choose.fform <-function(data,base_form,variable="dep",functionList, distribution=gaussian){
   ########################################
   ###   VALIDATION
   ########################################
@@ -30,7 +33,6 @@ choose.fform <-function(data,base_form,variable,functionList, distribution=gauss
   ########################################
   frameNames=c("smoothing","base")
   
-  
   for (j in 1:nforms){
     frameNames=c(frameNames, names(functionList)[j])
   }
@@ -52,7 +54,6 @@ choose.fform <-function(data,base_form,variable,functionList, distribution=gauss
   tableOut[2,1]=AIC(base)
   tableOut[2,2]=BIC(base)
   models <- list(base)
-  
   
   equation_update<-
     update.formula(base_form, ~ . +s(var))
@@ -114,10 +115,15 @@ choose.fform <-function(data,base_form,variable,functionList, distribution=gauss
 }
 
 
-fform <-function(data,variable,base_form, distribution=gaussian){
+
+
+fform <-function(data,variable="dep",base_form, distribution=gaussian){
   if (class(base_form)!="formula") {print("You need to provide a 'formula'-object, e.g. base_form<-formula(y~x1+x2), Please see ?fform or ?formula for an example")}
   stopifnot(class(base_form)=="formula")
+
   
+  ## transform a explanatory variable
+  if(variable!="dep"){
   ## Predefined forms
   functionList <- list(
     "x" = function(x) x,
@@ -157,9 +163,13 @@ fform <-function(data,variable,base_form, distribution=gaussian){
   for (j in 1:nforms){
     frameNames=c(frameNames, names(functionList)[j])
   }
+  
+
   tableOut=matrix(nrow=nforms+2,ncol=3)
   rownames(tableOut)=frameNames
   colnames(tableOut)= c("AIC", "BIC","ranking (BIC)")
+
+
   
   
   ########################################
@@ -208,6 +218,39 @@ fform <-function(data,variable,base_form, distribution=gaussian){
   }
   names(models)<-namesLL
   
+  }
+  
+  ## transform the dependent variable
+  if(variable=="dep"){
+    trans<-c("identity","inverse", "log")
+    frameNames=trans
+    
+    tableOut=matrix(nrow=3,ncol=3)
+    rownames(tableOut)=frameNames
+    colnames(tableOut)= c("AIC", "BIC","ranking (BIC)")
+    
+    
+    ########################################
+    ###   Estimate models and save AIC + BIC
+    ########################################  
+
+    models<-list()
+    for (k in 1:3){
+      base<-gam(base_form, 
+                family=Gamma(make.link(trans[k]))
+                  # distribution
+                                      # "identity"
+                  # print(as.character(trans[k]))
+                ,
+                method="GCV.Cp",
+                data=data)  
+      ## save for output  
+      tableOut[k,1]=AIC(base)
+      tableOut[k,2]=BIC(base)
+      models <- list(models,base)
+    }
+  }
+  
   
   ## sort table after BIC
   tableOut[,1]<-round(tableOut[,1],2)
@@ -222,8 +265,17 @@ fform <-function(data,variable,base_form, distribution=gaussian){
   ## return list  
   #####################################################################
   print(tableOut)   ## print table
+  
+  if(variable!="dep"){
   print("Smoothing is a semi-parametric and data-driven transformation, please see Wood (2006) for an elaboration")   ## print GAM description
-  ## if the "variable" is repeated in "base_form"
+  }
+  
+  if(variable=="dep"){
+  functionList=list()
+  }
+  
+  
+      ## if the "variable" is repeated in "base_form"
   if(grepl(variable,toString(base_form))){print(paste("please note that you included",variable,"in the base-formula and it is also the variable you test"))}
 
   class(data)<-"data.frame"
@@ -262,8 +314,8 @@ plotff<-function(input){
   for (i in 1:length(control)){
     pred_frame[names(control)[i]]=as.numeric(rep(control[i],100))
   }
-  
-  ## predict dependent variable for each model
+
+    ## predict dependent variable for each model
   pred_frame$model_smoothing<-predict(input$models[["model_smoothing"]],newdata=pred_frame, type="response")
   pred_frame$model_base<-predict(input$models[["model_base"]],newdata=pred_frame, type="response")
   
@@ -274,13 +326,16 @@ plotff<-function(input){
     pred_frame$var<-input$functionList[[a]](pred_frame$var_orig)
     pred_frame[paste("model",i,sep="_")]=predict(input$models[[paste("model",i,sep="_")]],newdata=pred_frame, type="response")
   }   
+  
+  ###########################################################################
+  ###############################################################################
   firstM=length(control) + 4 ## first model in pred_frame
   lastM=dim(pred_frame)[2] ## last model in pred_frame
   
-
+  
   ### Plotting
-  limx=c(min(pred_frame$var),max(pred_frame$var)) ## limits for x-axis
-  limy=c(min(pred_frame$model_smoothing), max(pred_frame$model_smoothing)) ## limits for y-axis   
+  limy=c(as.numeric(quantile(input$models$model_smoothing$y,0.1)),as.numeric(quantile(input$models$model_smoothing$y,0.9))) ## limits for y-axis   
+  limx=c(as.numeric(quantile(pred_frame$var_orig,0.1)),as.numeric(quantile(pred_frame$var_orig,0.9))) ## limits for x-axis   
   
   #### plotting the the fit 
   par(mar=c(4, 4, 8.1, 12), xpd=TRUE)
@@ -288,7 +343,7 @@ plotff<-function(input){
   
   ## Start plot
   
-  plot(model_smoothing~var, data=pred_frame, type="l",main="",sub="",xlab=input$variable,ylab=depNam, lwd=3, col="black", xlim=limx, ylim=limy) ## name variable of interest
+  plot(model_smoothing~var_orig, data=pred_frame, type="l",main="",sub="",xlab=input$variable,ylab=depNam, lwd=3, col="black", xlim=limx, ylim=limy) ## name variable of interest
   
   ## adding base and  functional form lines 
   color<-c("darkred","aquamarine4","darkgrey","blue3","orange3","brown3","chartreuse4","springgreen","gold","steelblue2","hotpink","blueviolet")
@@ -299,16 +354,16 @@ plotff<-function(input){
   colL<-vector()
   for (i in nameslS){
     n<-n+1
-    lines(get(i,pred_frame)~get("var",pred_frame),
+    lines(get(i,pred_frame)~pred_frame$var_orig,
           col= color[n], lwd=2)
     colL=cbind(colL,as.character(color[n]))
   }
   
   
-  lines(get("model_smoothing",pred_frame)~get("var",pred_frame),col="black", lwd=3)
+  lines(get("model_smoothing",pred_frame)~pred_frame$var_orig,col="black", lwd=3)
   nameslS<-gsub("model_","",nameslS)
   
-  legend(limx[2],limy[2],
+  legend(limx[2]*1.1,limy[2],
          cex=1,bty="n",
          nameslS, 
          fill=colL, 

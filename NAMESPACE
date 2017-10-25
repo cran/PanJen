@@ -3,3 +3,4 @@ importFrom(graphics, legend,lines,par,plot)
 importFrom(stats, AIC, BIC, formula,gaussian,median,quantile,
              model.frame, predict,update.formula)
 importFrom(mgcv, gam)
+importFrom("stats", "Gamma", "make.link")
