@@ -295,8 +295,6 @@ plotff<-function(input){
   nameslS<-names(input$models)
   ms<-grep("model_smoothing",nameslS)
   mb<-grep("model_base",nameslS)
-  # input$variable
-  # input$models$model_base
   
   ######################################################################
   ### creating prediction frame 
@@ -305,7 +303,7 @@ plotff<-function(input){
   ## 100 points from min to max of variable
   pred_frame<-data.frame(matrix(NA, nrow=100, ncol=1))
   var<-get(input$variable,input$dataset)
-  pred_frame$var<-seq(as.numeric(quantile(var,0.05)),as.numeric(quantile(var,0.95)),(as.numeric(quantile(var,0.95))-as.numeric(quantile(var,0.05)))/100)[1:100]
+  pred_frame$var<-seq(as.numeric(quantile(var,0.1)),as.numeric(quantile(var,0.9)),(as.numeric(quantile(var,0.9))-as.numeric(quantile(var,0.1)))/100)[1:100]
   
   ## set all control variable to median value
   control=apply(data.frame(input$models$model_base$model),2, median)
@@ -321,10 +319,14 @@ plotff<-function(input){
   
   pred_frame$var_orig<-pred_frame$var
   a=0
+  ylimits<-c()
   for (i in namesLL){ ## predict y for each model
     a=a+1
     pred_frame$var<-input$functionList[[a]](pred_frame$var_orig)
-    pred_frame[paste("model",i,sep="_")]=predict(input$models[[paste("model",i,sep="_")]],newdata=pred_frame, type="response")
+    
+    ac=predict(input$models[[paste("model",i,sep="_")]],newdata=pred_frame, type="response")
+    pred_frame[paste("model",i,sep="_")]<-ac
+    ylimits<-c(ylimits,ac)
   }   
   
   ###########################################################################
@@ -334,11 +336,11 @@ plotff<-function(input){
   
   
   ### Plotting
-  limy=c(as.numeric(quantile(input$models$model_smoothing$y,0.1)),as.numeric(quantile(input$models$model_smoothing$y,0.9))) ## limits for y-axis   
-  limx=c(as.numeric(quantile(pred_frame$var_orig,0.1)),as.numeric(quantile(pred_frame$var_orig,0.9))) ## limits for x-axis   
+  limy=c(min(ylimits),max(ylimits)) ## limits for y-axis   
+  limx=c(min(pred_frame$var_orig),max(pred_frame$var_orig)) ## limits for x-axis   
   
   #### plotting the the fit 
-  par(mar=c(4, 4, 8.1, 12), xpd=TRUE)
+  par(mar=c(4, 4, 4,6), xpd=TRUE)
   opt <- options("scipen" = 20)
   
   ## Start plot
@@ -363,7 +365,9 @@ plotff<-function(input){
   lines(get("model_smoothing",pred_frame)~pred_frame$var_orig,col="black", lwd=3)
   nameslS<-gsub("model_","",nameslS)
   
-  legend(limx[2]*1.1,limy[2],
+  legend("right",
+         inset=-0.375,
+    # limx[2],limy[2],
          cex=1,bty="n",
          nameslS, 
          fill=colL, 

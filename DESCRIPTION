@@ -1,6 +1,6 @@
 Package: PanJen
-Version: 1.5
-Date: 2017-10-25
+Version: 1.6
+Date: 2017-11-01
 Title: A Semi-Parametric Test for Specifying Functional Form
 Author: Toke Emil Panduro <tepp@ifro.ku.dk>, Cathrine Ulla Jensen <cuj@ifro.ku.dk>
 Maintainer: Cathrine Ulla Jensen <cuj@ifro.ku.dk>
@@ -10,6 +10,6 @@ License: GPL (>= 2)
 LazyLoad: yes
 LazyData: yes
 NeedsCompilation: no
-Packaged: 2017-10-25 11:48:14 UTC; msq431
+Packaged: 2017-11-01 14:02:47 UTC; msq431
 Repository: CRAN
-Date/Publication: 2017-10-25 12:05:46 UTC
+Date/Publication: 2017-11-01 14:10:26 UTC
